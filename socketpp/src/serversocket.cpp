@@ -1,6 +1,15 @@
 #include "serversocket.hpp"
 
 
+ServerSocket::~ServerSocket()
+{
+  if(this->socketfd != -1)
+  {
+    this->close();
+  }
+}
+
+
 /**
  * @brief Create a new ServerSocket objects that listen on < port >.
  * @throw See `ServerSocket::open()`.
@@ -23,7 +32,8 @@ ServerSocket& ServerSocket::operator=(ServerSocket&& other)
 {
   //? protezione contro l'auto-assegnamento?
 
-  if( this->is_open() ) {
+  if(this->is_open())
+  {
     this->close();
   }
 
@@ -42,9 +52,10 @@ ServerSocket& ServerSocket::operator=(ServerSocket&& other)
  */
 void ServerSocket::open(std::string const& port, int max_requests)
 {
-  // If the socket is already open, fail
-  if( this->is_open() ) {
-    throw std::logic_error("ServerSocket::open(): socket already open");
+  // If the socket is already open, close it first
+  if( this->is_open() )
+  {
+    this->close();
   }
 
   // 1. Ottengo informazioni sul servizio che voglio diventare
@@ -56,19 +67,23 @@ void ServerSocket::open(std::string const& port, int max_requests)
   addrinfo* res_addrinfo;
   int ret;  // valore di ritorno delle varie funzioni invocate
 
-  if( (ret = getaddrinfo(nullptr, port.c_str(), &hints, &res_addrinfo)) != 0) {
+  if( (ret = getaddrinfo(nullptr, port.c_str(), &hints, &res_addrinfo)) != 0)
+  {
     throw std::runtime_error( std::string("getaddrinfo(): ") + gai_strerror(ret) );
   }
 
   // 2. Try to execute socket() and bind() for each hint found by getaddrinfo()
   addrinfo* found = nullptr;
   std::string errors;
-  for(auto ptr = res_addrinfo; (ptr != nullptr) && (found == nullptr); ptr = ptr->ai_next) {
-    if(( ret = ::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol) ) == -1) {
+  for(auto ptr = res_addrinfo; (ptr != nullptr) && (found == nullptr); ptr = ptr->ai_next)
+  {
+    if(( ret = ::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol) ) == -1)
+    {
       errors += get_strerror(errno, ptr);
       // continue to iterate through the next hint
     }
-    else {
+    else
+    {
       constexpr int yes { 1 };  // we want reuse the pair < address, port >
       if( ::setsockopt(ret, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1 ) {
         throw std::system_error( errno, std::system_category(), "setsockopt()" );
@@ -84,7 +99,8 @@ void ServerSocket::open(std::string const& port, int max_requests)
       }
     }
   }
-  if( !found ) {
+  if(!found)
+  {
     throw std::runtime_error( "Unable to socket() or bind() to any addrinfo result. Error for each addrinfo node:\n" + errors );
   }
 
@@ -101,12 +117,13 @@ void ServerSocket::open(std::string const& port, int max_requests)
 /**
  * @brief Close the socket invoking `close()` to his file descriptor.
  */
-void ServerSocket::close()
+void ServerSocket::close() noexcept
 {
-  if( ::close(this->socketfd) == -1 ) {
-    throw std::system_error( errno, std::system_category(), "close()" );
+  if(this->is_open())
+  {
+    ::close(this->socketfd);
+    this->socketfd = -1;
   }
-  this->socketfd = -1;
 }
 
 /**
@@ -116,6 +133,11 @@ void ServerSocket::close()
  */
 Socket ServerSocket::accept(std::chrono::milliseconds timeout)
 {
+  if( !this->is_open() )
+  {
+    return Socket();
+  }
+
   sockaddr_storage addr;
   socklen_t addr_size = sizeof(sockaddr_storage);
 
@@ -125,11 +147,12 @@ Socket ServerSocket::accept(std::chrono::milliseconds timeout)
   };
 
   int poll_ret = poll( pfds, std::size(pfds), timeout.count() ? timeout.count() : -1 );
-  if(poll_ret == -1) {
+  if(poll_ret == -1)
+  {
     throw std::system_error( errno, std::system_category(), "poll()" );
   }
 
-  if( !poll_ret ) {  // timeout occur
+  if(!poll_ret) {  // timeout occur
     return Socket();  // returns a non valid socket //? è giusto così?
   }
 
@@ -149,11 +172,9 @@ Socket ServerSocket::accept(std::chrono::milliseconds timeout)
  * @warning This function cause the thread waiting on `ServerSocket::accept()` to throw because of EBADF 
  *          ("Bad file descriptor").
  */
-void ServerSocket::stop_accept()
+void ServerSocket::stop_accept() noexcept
 {
-  if( shutdown(this->socketfd, SHUT_RDWR) == -1 ) {
-    throw std::system_error( errno, std::system_category(), "shutdown()" );
-  }
+  shutdown(this->socketfd, SHUT_RDWR);
 
   this->socketfd = -1;
 }

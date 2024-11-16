@@ -1,22 +1,22 @@
 cmake_minimum_required(VERSION 3.15)
 project(socketpp CXX)
 
-set(SOURCES
+set( SOURCES
   src/socket.cpp
   src/serversocket.cpp
 )
 
 add_library(socketpp STATIC)
 
-target_sources(socketpp
+target_sources( socketpp
   PRIVATE ${SOURCES}
 )
 
-target_include_directories(socketpp
+target_include_directories( socketpp
   PRIVATE   include/socketpp/
   INTERFACE include/
 )
 
-target_compile_features(socketpp
-  INTERFACE cxx_std_23 
+target_compile_features( socketpp
+  PUBLIC cxx_std_23 
 )

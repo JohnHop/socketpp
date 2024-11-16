@@ -14,24 +14,24 @@
 
 class ServerSocket
 {
-  int socketfd { -1 };
+  int socketfd{-1};
   
 public:
-  ServerSocket(void) = default;
-  ServerSocket(std::string const& port, int max_requests = 5);
+  ServerSocket() = default;
+  ServerSocket(std::string const&, int max_requests = 5);
   ServerSocket(ServerSocket&& other);
   ServerSocket& operator=(ServerSocket&&);
-  ~ServerSocket() { this->close(); }
+  ~ServerSocket();
 
   // Deleted
   ServerSocket(ServerSocket const&) = delete;
   ServerSocket& operator=(ServerSocket const&) = delete;
   
   // Operations
-  void open(std::string const& port, int max_requests);
-  void close();
+  void open(std::string const&, int max_requests = 5);
+  void close() noexcept;
   Socket accept(std::chrono::milliseconds ms = std::chrono::milliseconds{});
-  void stop_accept();
+  void stop_accept() noexcept;
   
   // Getters
   bool is_open() const { return this->socketfd != -1; };

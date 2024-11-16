@@ -1,39 +1,97 @@
 #include <cstdlib>
-#include <stdexcept>
-#include <system_error>
+#include <print>
 #include <iostream>
-#include <format>
-#include <thread>
-
-#include <netdb.h>
-#include <sys/socket.h>
-
-#include <unistd.h>
+#include <map>
+#include <functional>
+#include <iterator>
 
 #include "socketpp/socket.hpp"
 
 
+Socket sock;
+
+
+void command_open(std::string const& expression)
+{
+  auto const spacePos = expression.find_first_of(' ');
+  if(spacePos == std::string::npos)
+  {
+    std::println("Invalid expression: {}", expression);
+  }
+  else
+  {
+    auto const hostname = expression.substr(0, spacePos);
+    auto const port = expression.substr(spacePos+1);
+
+    sock.open(hostname, port);
+    std::println("Connected!");
+  }
+}
+
+void command_close(std::string const& expression)
+{
+  sock.close();
+
+  std::println("Connection closed");
+}
+
+void command_write(std::string const& message)
+{
+  auto bytes = sock.send(message);
+  std::println("Sent {} bytes", bytes);
+}
+
+void command_read(std::string const&)
+{
+  std::string buffer(256, 0);
+  auto bytes = sock.recv(buffer);
+  std::println("Readed {} bytes: {}", bytes, buffer);
+}
+
+void show_prompt()
+{
+  std::print("client > ");
+}
+
 int main()
 {
-  Socket sock("localhost", "1234");
-  std::cout << "Connected!" << std::endl;
+  std::map<std::string, std::function<void(std::string)>> commands = {
+    { "open", command_open },
+    { "close", command_close },
+    { "write", command_write },
+    { "read", command_read }
+  };
 
-  const size_t size = 100;
-  char buffer[size];
-  size_t ret = 1;
-  while( ret ) {
-    std::cout << "Receving..." << std::flush;
-    ret = sock.read(buffer);
-    std::cout << std::endl;
-    if( ret > 0 ) {
-      std::cout << std::format("Received {} bytes and msg: {}", ret, buffer) << std::endl;
+
+  std::string input;
+  std::println("(ctrl+d to quit)");
+  show_prompt();
+
+  while(std::getline(std::cin, input))
+  {
+    if(input.empty()) // if the user press enter with no command
+    {
+      show_prompt();
+      continue;
     }
-    else if( ret == 0) {
-      std::cout << "EOF detected." << std::endl;
+
+    auto spacePos = input.find_first_of(' ');
+    auto const command = input.substr(0, spacePos);
+    auto const expression = (spacePos != std::string::npos) ? input.substr(spacePos+1) : std::string{};
+    
+    auto foundIt = commands.find(command);
+    if(foundIt != std::end(commands))
+    {
+      commands.at(command)( expression );
     }
+    else {
+      std::println("command {} not found", command);
+    }
+
+    show_prompt();
   }
 
-  std::cout << "Connection closed." << std::endl;
+  std::print("\n");
 
   return EXIT_SUCCESS;
 }

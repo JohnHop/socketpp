@@ -19,15 +19,15 @@
 
 class Socket
 {
-  int socketfd { -1 };
+  int socketfd{-1};
 
 public:
-  Socket(void) = default; // non-valid socket
+  Socket() = default; // non-valid socket
   explicit Socket(int fd);
   Socket(std::string const& hostname, std::string const& port);
   Socket(Socket&&);
   Socket& operator=(Socket&&);
-  ~Socket() { this->close(); }
+  ~Socket();
 
   // Prevent copy
   Socket(Socket const&) = delete;
@@ -35,14 +35,14 @@ public:
 
   // Operations
   void open(std::string const& hostname, std::string const& port);
-  size_t read(std::span<char> buffer, int flags = 0);
-  size_t write(std::span<char const> buffer, int flags = 0);
-  void close();
+  void close() noexcept;
+  std::size_t recv(std::span<char> buffer, int flags = 0);
+  std::size_t send(std::span<char const> buffer, int flags = 0);
 
   // Getters
   bool is_open() const { return this->socketfd != -1; };
   int get_fd() const { return this->socketfd; }
-  explicit operator bool() const { return this->is_open(); }
+  explicit operator bool() const { return this->is_open(); }  // like std::fstream
 };
 
 
